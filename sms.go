@@ -10,20 +10,42 @@ import (
 
 // SmsResponse is returned after a text/sms message is posted to Twilio
 type SmsResponse struct {
-	Sid         string  `json:"sid"`
-	DateCreated string  `json:"date_created"`
-	DateUpdate  string  `json:"date_updated"`
-	DateSent    string  `json:"date_sent"`
-	AccountSid  string  `json:"account_sid"`
-	To          string  `json:"to"`
-	From        string  `json:"from"`
-	NumMedia    string  `json:"num_media"`
-	Body        string  `json:"body"`
-	Status      string  `json:"status"`
-	Direction   string  `json:"direction"`
-	ApiVersion  string  `json:"api_version"`
-	Price       *string `json:"price,omitempty"`
-	Url         string  `json:"uri"`
+	AccountSid      string          `json:"account_sid"`
+	ApiVersion      string          `json:"api_version"`
+	Body            string          `json:"body"`
+	DateCreated     string          `json:"date_created"`
+	DateSent        string          `json:"date_sent"`
+	DateUpdate      string          `json:"date_updated"`
+	Direction       string          `json:"direction"`
+	ErrorCode       *string         `json:"error_code"`
+	ErrorMessage    *string         `json:"error_message"`
+	From            string          `json:"from"`
+	NumMedia        string          `json:"num_media"`
+	NumSegments     string          `json:"num_segments"`
+	Price           *string         `json:"price,omitempty"`
+	PriceUnit       string          `json:"price_unit"` // currency
+	Sid             string          `json:"sid"`
+	Status          string          `json:"status"`
+	SubresourceUris SubresourceUris `json:"subresource_uris"`
+	To              string          `json:"to"`
+	Url             string          `json:"uri"`
+}
+
+type SmsListResponse struct {
+	End             int
+	FirstPageUri    string
+	NextPageUri     string
+	Page            int
+	PageSize        int
+	PreviousPageUri string
+	Messages        []SmsResponse
+	Start           int
+	Uri             string
+}
+
+type SubresourceUris struct {
+	Feedback string `json:"feedback"`
+	Media    string `json:"media"`
 }
 
 // DateCreatedAsTime returns SmsResponse.DateCreated as a time.Time object
@@ -101,6 +123,32 @@ func (twilio *Twilio) GetSMS(sid string) (smsResponse *SmsResponse, exception *E
 	smsResponse = new(SmsResponse)
 	err = json.Unmarshal(responseBody, smsResponse)
 	return smsResponse, exception, err
+}
+
+// GetSMS uses Twilio to get information about a text message.
+// See https://www.twilio.com/docs/api/rest/sms for more information.
+func (twilio *Twilio) GetSMSList() (smsListResponse *SmsListResponse, exception *Exception, err error) {
+	twilioUrl := twilio.BaseUrl + "/Accounts/" + twilio.AccountSid + "/Messages.json"
+
+	res, err := twilio.get(twilioUrl)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		exception = new(Exception)
+		err = json.NewDecoder(res.Body).Decode(exception)
+
+		// We aren't checking the error because we don't actually care.
+		// It's going to be passed to the client either way.
+		return
+	}
+
+	smsListResponse = new(SmsListResponse)
+	err = json.NewDecoder(res.Body).Decode(smsListResponse)
+
+	return
 }
 
 // SendSMSWithCopilot uses Twilio Copilot to send a text message.
